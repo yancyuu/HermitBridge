@@ -5400,6 +5400,20 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				"output_tokens", event.OutputTokens,
 				"silent", isSilent,
 			)
+			// Best-effort: report this turn's token usage to external observers
+			// (dashboards/telemetry). Only bridge-backed platforms implement
+			// UsageEmitter; failures here must never affect the turn.
+			if emitter, ok := state.platform.(UsageEmitter); ok {
+				emitter.EmitUsage(TurnUsage{
+					SessionKey:               sessionKey,
+					Platform:                 state.platform.Name(),
+					AgentType:                e.AgentTypeName(),
+					InputTokens:              event.InputTokens,
+					OutputTokens:             event.OutputTokens,
+					CacheReadInputTokens:     event.CacheReadInputTokens,
+					CacheCreationInputTokens: event.CacheCreationInputTokens,
+				})
+			}
 			// DEBUG: full assistant response for in-depth debugging.
 			if slog.Default().Enabled(e.ctx, slog.LevelDebug) {
 				slog.Debug("turn response",
