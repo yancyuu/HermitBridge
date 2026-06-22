@@ -144,7 +144,7 @@ type Platform struct {
 	botOpenID        string
 	peerBots         map[string]string // app_id -> friendly alias, for quoted-reply attribution
 	mentionMap       map[string]string // agent name -> open_id (for outbound @ resolution)
-	userNameCache    sync.Map          // open_id -> display name
+	userNameCache    sync.Map          // union_id -> display name
 	chatNameCache    sync.Map          // chat_id -> chat name
 	chatMemberCache  sync.Map          // chatID -> *chatMemberEntry
 	recalledMu       sync.Mutex
@@ -1310,6 +1310,7 @@ func (p *Platform) onMessage(ctx context.Context, event *larkim.P2MessageReceive
 		chatType = *msg.ChatType
 	}
 	mentionCount := len(msg.Mentions)
+	p.cacheMentionUserNames(msg.Mentions)
 	slog.Debug(p.tag()+": inbound message",
 		"message_id", messageID,
 		"chat_id", chatID,
@@ -1413,11 +1414,8 @@ func (p *Platform) dispatchMessage(ctx context.Context, msgType, content string,
 		return
 	}
 
-	// Resolve user and chat names asynchronously so SDK dispatcher is not blocked.
-	userName := ""
-	if userID != "" {
-		userName = p.resolveUserName(userID)
-	}
+	// Resolve display metadata asynchronously so SDK dispatcher is not blocked.
+	userName := p.resolveUserName(userID)
 	chatName := p.resolveChatName(chatID)
 
 	// If this message is a reply to another message, fetch the quoted content
@@ -1673,46 +1671,63 @@ func (p *Platform) dispatchMessage(ctx context.Context, msgType, content string,
 	}
 }
 
-// resolveUserName fetches a user's display name via the Contact API, with caching.
-func (p *Platform) resolveUserName(openID string) string {
-	if !isValidFeishuLookupID(openID) {
-		return openID
+// resolveUserName fetches a user's display name by union_id via the Contact API, with caching.
+func (p *Platform) resolveUserName(userID string) string {
+	if !isValidFeishuLookupID(userID) {
+		return ""
 	}
-	if cached, ok := p.userNameCache.Load(openID); ok {
+	if cached, ok := p.userNameCache.Load(userID); ok {
 		return cached.(string)
 	}
 	resp, err := p.client.Contact.User.Get(context.Background(),
 		larkcontact.NewGetUserReqBuilder().
-			UserId(openID).
-			UserIdType("open_id").
+			UserId(userID).
+			UserIdType(larkcontact.UserIdTypeUnionId).
 			Build())
 	if err != nil {
-		slog.Debug(p.tag()+": resolve user name failed", "open_id", openID, "error", err)
-		return openID
+		slog.Warn(p.tag()+": resolve user name failed", "user_id", userID, "user_id_type", larkcontact.UserIdTypeUnionId, "error", err)
+		return ""
 	}
-	if !resp.Success() || resp.Data == nil || resp.Data.User == nil || resp.Data.User.Name == nil {
-		slog.Debug(p.tag()+": resolve user name: no data", "open_id", openID, "code", resp.Code)
-		return openID
+	if !resp.Success() {
+		slog.Warn(p.tag()+": resolve user name unsuccessful", "user_id", userID, "user_id_type", larkcontact.UserIdTypeUnionId, "code", resp.Code, "msg", resp.Msg)
+		return ""
 	}
-	name := *resp.Data.User.Name
-	p.userNameCache.Store(openID, name)
+	if resp.Data == nil || resp.Data.User == nil {
+		slog.Warn(p.tag()+": resolve user name missing user", "user_id", userID, "user_id_type", larkcontact.UserIdTypeUnionId, "code", resp.Code, "msg", resp.Msg)
+		return ""
+	}
+	if resp.Data.User.Name == nil || strings.TrimSpace(*resp.Data.User.Name) == "" {
+		slog.Warn(p.tag()+": resolve user name missing name", "user_id", userID, "user_id_type", larkcontact.UserIdTypeUnionId, "code", resp.Code, "msg", resp.Msg)
+		return ""
+	}
+	name := strings.TrimSpace(*resp.Data.User.Name)
+	p.userNameCache.Store(userID, name)
 	return name
 }
 
 func userIDFromEvent(id *larkim.UserId) string {
-	if id == nil {
+	if id == nil || id.UnionId == nil {
 		return ""
 	}
-	if id.OpenId != nil && *id.OpenId != "" {
-		return *id.OpenId
+	return *id.UnionId
+}
+
+func (p *Platform) cacheMentionUserNames(mentions []*larkim.MentionEvent) {
+	for _, mention := range mentions {
+		if mention == nil || mention.Id == nil || mention.Name == nil {
+			continue
+		}
+		name := strings.TrimSpace(*mention.Name)
+		if name == "" {
+			continue
+		}
+		if mention.Id.OpenId != nil && *mention.Id.OpenId != "" {
+			p.userNameCache.Store(*mention.Id.OpenId, name)
+		}
+		if mention.Id.UnionId != nil && *mention.Id.UnionId != "" {
+			p.userNameCache.Store(*mention.Id.UnionId, name)
+		}
 	}
-	if id.UserId != nil && *id.UserId != "" {
-		return *id.UserId
-	}
-	if id.UnionId != nil && *id.UnionId != "" {
-		return *id.UnionId
-	}
-	return ""
 }
 
 func isValidFeishuLookupID(id string) bool {
@@ -1732,10 +1747,10 @@ func isValidFeishuLookupID(id string) bool {
 	return true
 }
 
-// resolveUserNames batch-resolves open_ids to display names.
-func (p *Platform) resolveUserNames(openIDs []string) map[string]string {
-	names := make(map[string]string, len(openIDs))
-	for _, id := range openIDs {
+// resolveUserNames batch-resolves Feishu user identifiers to display names.
+func (p *Platform) resolveUserNames(userIDs []string) map[string]string {
+	names := make(map[string]string, len(userIDs))
+	for _, id := range userIDs {
 		if _, ok := names[id]; !ok {
 			names[id] = p.resolveUserName(id)
 		}

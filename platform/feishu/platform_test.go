@@ -909,18 +909,22 @@ func TestLark_ReconstructReplyCtx(t *testing.T) {
 	}
 }
 
-func TestUserIDFromEventFallsBackToUserID(t *testing.T) {
+func TestUserIDFromEventUsesUnionIDOnly(t *testing.T) {
 	userID := "uid_user123"
-	if got := userIDFromEvent(&larkim.UserId{UserId: &userID}); got != userID {
-		t.Fatalf("userIDFromEvent() = %q, want %q", got, userID)
+	unionID := "on_union123"
+	if got := userIDFromEvent(&larkim.UserId{UserId: &userID, UnionId: &unionID}); got != unionID {
+		t.Fatalf("userIDFromEvent() = %q, want %q", got, unionID)
+	}
+	if got := userIDFromEvent(&larkim.UserId{UserId: &userID}); got != "" {
+		t.Fatalf("userIDFromEvent() = %q, want empty without union_id", got)
 	}
 }
 
 func TestResolveUserNameSkipsInvalidLookupID(t *testing.T) {
 	p := &Platform{}
 	for _, id := range []string{"", "feishu:oc_chat:ou_user", "ou user"} {
-		if got := p.resolveUserName(id); got != id {
-			t.Fatalf("resolveUserName(%q) = %q, want unchanged", id, got)
+		if got := p.resolveUserName(id); got != "" {
+			t.Fatalf("resolveUserName(%q) = %q, want empty unresolved name", id, got)
 		}
 	}
 }
