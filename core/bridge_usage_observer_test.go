@@ -94,9 +94,8 @@ func TestBridge_UsageObserver(t *testing.T) {
 		Platform:                 "feishu",
 		AgentType:                "claudecode",
 		TurnID:                   "om_turn_1",
-		UserID:                   "user-1",
-		UserName:                 "Alice",
-		ChatName:                 "Test Group",
+		UserID:                   "on_unique_user_1",
+		ChatID:                   "oc_chat_1",
 		InputTokens:              932,
 		OutputTokens:             587,
 		CacheReadInputTokens:     126016,
@@ -130,14 +129,26 @@ func TestBridge_UsageObserver(t *testing.T) {
 		if msg["turn_id"] != "om_turn_1" {
 			t.Fatalf("subscriber%d: turn_id = %v, want om_turn_1", i+1, msg["turn_id"])
 		}
-		if msg["user_id"] != "user-1" {
-			t.Fatalf("subscriber%d: user_id = %v, want user-1", i+1, msg["user_id"])
+		if msg["user_id"] != "on_unique_user_1" {
+			t.Fatalf("subscriber%d: user_id = %v, want on_unique_user_1", i+1, msg["user_id"])
 		}
-		if msg["user_name"] != "Alice" {
-			t.Fatalf("subscriber%d: user_name = %v, want Alice", i+1, msg["user_name"])
+		if msg["chat_id"] != "oc_chat_1" {
+			t.Fatalf("subscriber%d: chat_id = %v, want oc_chat_1", i+1, msg["chat_id"])
 		}
-		if msg["chat_name"] != "Test Group" {
-			t.Fatalf("subscriber%d: chat_name = %v, want Test Group", i+1, msg["chat_name"])
+		if _, ok := msg["user_name"]; ok {
+			t.Fatalf("subscriber%d: usage event must not carry user_name", i+1)
+		}
+		if _, ok := msg["chat_name"]; ok {
+			t.Fatalf("subscriber%d: usage event must not carry chat_name", i+1)
+		}
+		if _, ok := msg["open_id"]; ok {
+			t.Fatalf("subscriber%d: usage event must not carry open_id", i+1)
+		}
+		if _, ok := msg["union_id"]; ok {
+			t.Fatalf("subscriber%d: usage event must not carry union_id", i+1)
+		}
+		if _, ok := msg["identity"]; ok {
+			t.Fatalf("subscriber%d: usage event must not carry identity metadata", i+1)
 		}
 		if got := jsonInt(msg, "input_tokens"); got != 932 {
 			t.Fatalf("subscriber%d: input_tokens = %d, want 932", i+1, got)

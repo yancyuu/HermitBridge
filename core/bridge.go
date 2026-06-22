@@ -1404,11 +1404,8 @@ func (bs *BridgeServer) BroadcastUsage(usage TurnUsage) {
 	if usage.UserID != "" {
 		msg["user_id"] = usage.UserID
 	}
-	if usage.UserName != "" {
-		msg["user_name"] = usage.UserName
-	}
-	if usage.ChatName != "" {
-		msg["chat_name"] = usage.ChatName
+	if usage.ChatID != "" {
+		msg["chat_id"] = usage.ChatID
 	}
 
 	bs.mu.RLock()

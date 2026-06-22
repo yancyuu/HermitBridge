@@ -295,6 +295,9 @@ func TestDispatchMessageKeepsMentionOnlyQuotedText(t *testing.T) {
 		if msg.Content != "" {
 			t.Fatalf("Content = %q, want empty user text after bot mention stripping", msg.Content)
 		}
+		if msg.UserName != "" {
+			t.Fatalf("UserName = %q, want empty unresolved name instead of user id", msg.UserName)
+		}
 		if !strings.Contains(msg.ExtraContent, "请总结这条消息") {
 			t.Fatalf("ExtraContent = %q, want quoted text", msg.ExtraContent)
 		}

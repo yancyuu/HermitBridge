@@ -329,7 +329,7 @@ type queuedMessage struct {
 	fromVoice         bool
 	userID            string
 	userName          string // sender's display name for sender injection
-	chatName          string // human-readable chat/group name for usage reporting
+	chatName          string // human-readable chat/group name for sender injection
 	msgPlatform       string // platform name for sender injection
 	msgSessionKey     string // session key for extracting chat ID
 	channelKey        string // platform-provided channel identifier (preferred over sessionKey extraction)
@@ -344,6 +344,7 @@ type interactiveState struct {
 	currentMessageID       string
 	currentTurnUserID      string
 	currentTurnUserName    string
+	currentTurnChatID      string
 	currentTurnChatName    string
 	workspaceDir           string
 	agent                  Agent
@@ -3428,6 +3429,7 @@ func (e *Engine) processInteractiveMessageWith(p Platform, msg *Message, session
 	state.currentMessageID = msg.MessageID
 	state.currentTurnUserID = msg.UserID
 	state.currentTurnUserName = msg.UserName
+	state.currentTurnChatID = effectiveChannelID(msg)
 	state.currentTurnChatName = msg.ChatName
 	state.currentTurnUserMessageTimeMs = msg.UserMessageTimeMs
 	state.mu.Unlock()
@@ -5190,8 +5192,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				state.mu.Lock()
 				usagePlatform := state.platform
 				usageUserID := state.currentTurnUserID
-				usageUserName := state.currentTurnUserName
-				usageChatName := state.currentTurnChatName
+				usageChatID := state.currentTurnChatID
 				state.mu.Unlock()
 				if usagePlatform != nil {
 					globalBridgeServer.BroadcastUsage(TurnUsage{
@@ -5200,8 +5201,7 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 						AgentType:                e.AgentTypeName(),
 						TurnID:                   msgID,
 						UserID:                   usageUserID,
-						UserName:                 usageUserName,
-						ChatName:                 usageChatName,
+						ChatID:                   usageChatID,
 						InputTokens:              event.InputTokens,
 						OutputTokens:             event.OutputTokens,
 						CacheReadInputTokens:     event.CacheReadInputTokens,
@@ -5429,6 +5429,10 @@ func (e *Engine) processInteractiveEvents(state *interactiveState, session *Sess
 				state.currentMessageID = queued.messageID
 				state.currentTurnUserID = queued.userID
 				state.currentTurnUserName = queued.userName
+				state.currentTurnChatID = queued.channelKey
+				if state.currentTurnChatID == "" {
+					state.currentTurnChatID = extractChannelID(queued.msgSessionKey)
+				}
 				state.currentTurnChatName = queued.chatName
 				state.fromVoice = queued.fromVoice
 				state.currentTurnUserMessageTimeMs = queued.userMessageTimeMs
@@ -5765,6 +5769,10 @@ func (e *Engine) drainPendingMessages(state *interactiveState, session *Session,
 		state.currentMessageID = queued.messageID
 		state.currentTurnUserID = queued.userID
 		state.currentTurnUserName = queued.userName
+		state.currentTurnChatID = queued.channelKey
+		if state.currentTurnChatID == "" {
+			state.currentTurnChatID = extractChannelID(queued.msgSessionKey)
+		}
 		state.currentTurnChatName = queued.chatName
 		state.fromVoice = queued.fromVoice
 		state.currentTurnUserMessageTimeMs = queued.userMessageTimeMs
