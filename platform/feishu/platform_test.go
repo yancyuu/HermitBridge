@@ -18,6 +18,7 @@ import (
 
 	"github.com/chenhg5/cc-connect/core"
 	callback "github.com/larksuite/oapi-sdk-go/v3/event/dispatcher/callback"
+	larkapplication "github.com/larksuite/oapi-sdk-go/v3/service/application/v6"
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 )
 
@@ -230,7 +231,7 @@ func TestInteractivePlatform_OnMessagePassesCardSenderToHandler(t *testing.T) {
 	event := &larkim.P2MessageReceiveV1{
 		Event: &larkim.P2MessageReceiveV1Data{
 			Sender: &larkim.EventSender{
-				SenderId:   &larkim.UserId{OpenId: &openID},
+				SenderId:   &larkim.UserId{OpenId: &openID, UnionId: stringPtr("on_test_user")},
 				SenderType: &senderType,
 			},
 			Message: &larkim.EventMessage{
@@ -286,7 +287,7 @@ func TestInteractivePlatform_CardActionPassesCardSenderToHandler(t *testing.T) {
 
 	_, err = ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: openID},
+			Operator: &callback.Operator{OpenID: openID, UserID: stringPtr("on_test_user")},
 			Action:   &callback.CallBackAction{Value: map[string]any{"action": action}},
 			Context:  &callback.Context{OpenChatID: chatID, OpenMessageID: messageID},
 		},
@@ -334,7 +335,7 @@ func TestInteractivePlatform_CardActionActWithoutCardResponseDoesNotWarn(t *test
 
 	resp, err := ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_test_user"},
+			Operator: &callback.Operator{OpenID: "ou_test_user", UserID: stringPtr("on_test_user")},
 			Action:   &callback.CallBackAction{Value: map[string]any{"action": "act:/delete-mode toggle session-1"}},
 			Context:  &callback.Context{OpenChatID: "oc_test_chat", OpenMessageID: "om_test_message"},
 		},
@@ -373,7 +374,7 @@ func TestInteractivePlatform_CardActionFormSubmitPassesSelectedIDs(t *testing.T)
 
 	_, err = ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_test_user"},
+			Operator: &callback.Operator{OpenID: "ou_test_user", UserID: stringPtr("on_test_user")},
 			Action: &callback.CallBackAction{
 				Value: map[string]any{"action": "act:/delete-mode form-submit"},
 				FormValue: map[string]any{
@@ -418,7 +419,7 @@ func TestInteractivePlatform_CardActionFormSubmitUsesActionNameFallback(t *testi
 
 	_, err = ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_test_user"},
+			Operator: &callback.Operator{OpenID: "ou_test_user", UserID: stringPtr("on_test_user")},
 			Action: &callback.CallBackAction{
 				Name: "delete_mode_submit",
 				FormValue: map[string]any{
@@ -462,7 +463,7 @@ func TestInteractivePlatform_CardActionFormCancelUsesActionNameFallback(t *testi
 
 	_, err = ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_test_user"},
+			Operator: &callback.Operator{OpenID: "ou_test_user", UserID: stringPtr("on_test_user")},
 			Action: &callback.CallBackAction{
 				Name: "delete_mode_cancel",
 			},
@@ -499,7 +500,7 @@ func TestInteractivePlatform_CardActionUsesCallbackSessionKey(t *testing.T) {
 
 	_, err = ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_test_user"},
+			Operator: &callback.Operator{OpenID: "ou_test_user", UserID: stringPtr("on_test_user")},
 			Action: &callback.CallBackAction{Value: map[string]any{
 				"action":      "cmd:/help",
 				"session_key": wantSessionKey,
@@ -543,7 +544,7 @@ func TestInteractivePlatform_ModelCardActionReturnsCardUpdate(t *testing.T) {
 
 	resp, err := ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_test_user"},
+			Operator: &callback.Operator{OpenID: "ou_test_user", UserID: stringPtr("on_test_user")},
 			Action:   &callback.CallBackAction{Value: map[string]any{"action": "act:/model switch 1"}},
 			Context:  &callback.Context{OpenChatID: "oc_test_chat", OpenMessageID: "om_test_message"},
 		},
@@ -677,7 +678,7 @@ func TestLark_SessionKeyPrefix(t *testing.T) {
 	_ = ip.onMessage(context.Background(), &larkim.P2MessageReceiveV1{
 		Event: &larkim.P2MessageReceiveV1Data{
 			Sender: &larkim.EventSender{
-				SenderId:   &larkim.UserId{OpenId: &openID},
+				SenderId:   &larkim.UserId{OpenId: &openID, UnionId: stringPtr("on_test_user")},
 				SenderType: &senderType,
 			},
 			Message: &larkim.EventMessage{
@@ -734,7 +735,7 @@ func TestLark_ThreadIsolationUsesRootSessionKey(t *testing.T) {
 	_ = ip.onMessage(context.Background(), &larkim.P2MessageReceiveV1{
 		Event: &larkim.P2MessageReceiveV1Data{
 			Sender: &larkim.EventSender{
-				SenderId:   &larkim.UserId{OpenId: &openID},
+				SenderId:   &larkim.UserId{OpenId: &openID, UnionId: stringPtr("on_test_user")},
 				SenderType: &senderType,
 			},
 			Message: &larkim.EventMessage{
@@ -791,7 +792,7 @@ func TestLark_GroupReplyAllWithThreadIsolationUsesRootSessionKeyWithoutMention(t
 	if err := ip.onMessage(context.Background(), &larkim.P2MessageReceiveV1{
 		Event: &larkim.P2MessageReceiveV1Data{
 			Sender: &larkim.EventSender{
-				SenderId:   &larkim.UserId{OpenId: &openID},
+				SenderId:   &larkim.UserId{OpenId: &openID, UnionId: stringPtr("on_test_user")},
 				SenderType: &senderType,
 			},
 			Message: &larkim.EventMessage{
@@ -917,6 +918,37 @@ func TestUserIDFromEventUsesUnionIDOnly(t *testing.T) {
 	}
 	if got := userIDFromEvent(&larkim.UserId{UserId: &userID}); got != "" {
 		t.Fatalf("userIDFromEvent() = %q, want empty without union_id", got)
+	}
+}
+
+func TestCardActionUserIDUsesUnionIDOnly(t *testing.T) {
+	openID := "ou_open123"
+	appUserID := "uid_user123"
+	unionID := "on_union123"
+
+	if got := userIDFromCardAction(&callback.Operator{OpenID: openID, UserID: &unionID}, ""); got != unionID {
+		t.Fatalf("userIDFromCardAction(union operator) = %q, want %q", got, unionID)
+	}
+	if got := userIDFromCardAction(&callback.Operator{OpenID: openID, UserID: &appUserID}, ""); got != "" {
+		t.Fatalf("userIDFromCardAction(app user_id) = %q, want empty", got)
+	}
+	if got := userIDFromCardAction(&callback.Operator{OpenID: openID}, "feishu:oc_chat:on_session_union"); got != "on_session_union" {
+		t.Fatalf("userIDFromCardAction(session fallback) = %q, want on_session_union", got)
+	}
+	if got := userIDFromCardAction(&callback.Operator{OpenID: openID}, "feishu:oc_chat:ou_open123"); got != "" {
+		t.Fatalf("userIDFromCardAction(openid session) = %q, want empty", got)
+	}
+}
+
+func TestApplicationUserIDUsesUnionIDOnly(t *testing.T) {
+	userID := "uid_user123"
+	openID := "ou_open123"
+	unionID := "on_union123"
+	if got := userIDFromApplicationUserID(&larkapplication.UserId{UserId: &userID, OpenId: &openID, UnionId: &unionID}); got != unionID {
+		t.Fatalf("userIDFromApplicationUserID() = %q, want %q", got, unionID)
+	}
+	if got := userIDFromApplicationUserID(&larkapplication.UserId{UserId: &userID, OpenId: &openID}); got != "" {
+		t.Fatalf("userIDFromApplicationUserID() = %q, want empty without union_id", got)
 	}
 }
 
@@ -1714,7 +1746,7 @@ func TestAllowChat_FiltersGroupMessages(t *testing.T) {
 			if err := ip.onMessage(context.Background(), &larkim.P2MessageReceiveV1{
 				Event: &larkim.P2MessageReceiveV1Data{
 					Sender: &larkim.EventSender{
-						SenderId:   &larkim.UserId{OpenId: &openID},
+						SenderId:   &larkim.UserId{OpenId: &openID, UnionId: stringPtr("on_test_user")},
 						SenderType: &senderType,
 					},
 					Message: &larkim.EventMessage{
@@ -1896,7 +1928,7 @@ func TestCardAction_NavFast_ReturnsCard(t *testing.T) {
 	start := time.Now()
 	resp, err := ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_test_user"},
+			Operator: &callback.Operator{OpenID: "ou_test_user", UserID: stringPtr("on_test_user")},
 			Action:   &callback.CallBackAction{Value: map[string]any{"action": "nav:/list"}},
 			Context:  &callback.Context{OpenChatID: "oc_test_chat", OpenMessageID: "om_test_message"},
 		},
@@ -1937,7 +1969,7 @@ func TestCardAction_NavSlow_ReturnsToastThenRefreshes(t *testing.T) {
 	start := time.Now()
 	resp, err := ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_test_user"},
+			Operator: &callback.Operator{OpenID: "ou_test_user", UserID: stringPtr("on_test_user")},
 			Action:   &callback.CallBackAction{Value: map[string]any{"action": "nav:/list"}},
 			Context:  &callback.Context{OpenChatID: "oc_test_chat", OpenMessageID: "om_test_message"},
 		},
@@ -1985,7 +2017,7 @@ func TestCardAction_NavSlow_NilCard_NoRefresh(t *testing.T) {
 
 	resp, err := ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_test_user"},
+			Operator: &callback.Operator{OpenID: "ou_test_user", UserID: stringPtr("on_test_user")},
 			Action:   &callback.CallBackAction{Value: map[string]any{"action": "nav:/list"}},
 			Context:  &callback.Context{OpenChatID: "oc_test_chat", OpenMessageID: "om_test_message"},
 		},
@@ -2042,7 +2074,7 @@ func TestOnMessage_OldMessageAfterRestartIsFiltered(t *testing.T) {
 	event := &larkim.P2MessageReceiveV1{
 		Event: &larkim.P2MessageReceiveV1Data{
 			Sender: &larkim.EventSender{
-				SenderId:   &larkim.UserId{OpenId: &openID},
+				SenderId:   &larkim.UserId{OpenId: &openID, UnionId: stringPtr("on_test_user")},
 				SenderType: &senderType,
 			},
 			Message: &larkim.EventMessage{
@@ -2106,7 +2138,7 @@ func TestOnMessage_NewMessageAfterRestartIsProcessed(t *testing.T) {
 	event := &larkim.P2MessageReceiveV1{
 		Event: &larkim.P2MessageReceiveV1Data{
 			Sender: &larkim.EventSender{
-				SenderId:   &larkim.UserId{OpenId: &openID},
+				SenderId:   &larkim.UserId{OpenId: &openID, UnionId: stringPtr("on_test_user")},
 				SenderType: &senderType,
 			},
 			Message: &larkim.EventMessage{
@@ -2169,7 +2201,7 @@ func TestOnMessage_GracePeriodMessageIsProcessed(t *testing.T) {
 	event := &larkim.P2MessageReceiveV1{
 		Event: &larkim.P2MessageReceiveV1Data{
 			Sender: &larkim.EventSender{
-				SenderId:   &larkim.UserId{OpenId: &openID},
+				SenderId:   &larkim.UserId{OpenId: &openID, UnionId: stringPtr("on_test_user")},
 				SenderType: &senderType,
 			},
 			Message: &larkim.EventMessage{
@@ -2207,7 +2239,7 @@ func TestCmdAction_WithoutAfterClick_DispatchesAndReturnsNil(t *testing.T) {
 
 	resp, err := ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_user1"},
+			Operator: &callback.Operator{OpenID: "ou_user1", UserID: stringPtr("on_user1")},
 			Action:   &callback.CallBackAction{Value: map[string]any{"action": "cmd:/verify F9F-162"}},
 			Context:  &callback.Context{OpenChatID: "oc_chat1", OpenMessageID: "om_msg1"},
 		},
@@ -2252,7 +2284,7 @@ func TestCmdAction_WithAfterClick_DispatchesAndReturnsCard(t *testing.T) {
 
 	resp, err := ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_user1"},
+			Operator: &callback.Operator{OpenID: "ou_user1", UserID: stringPtr("on_user1")},
 			Action: &callback.CallBackAction{Value: map[string]any{
 				"action":      "cmd:/run-task 123",
 				"after_click": afterClick,
@@ -2307,7 +2339,7 @@ func TestCmdAction_WithAfterClick_SessionKeyRoutes(t *testing.T) {
 
 	resp, err := ip.onCardAction(&callback.CardActionTriggerEvent{
 		Event: &callback.CardActionTriggerRequest{
-			Operator: &callback.Operator{OpenID: "ou_user1"},
+			Operator: &callback.Operator{OpenID: "ou_user1", UserID: stringPtr("on_user1")},
 			Action: &callback.CallBackAction{Value: map[string]any{
 				"action":      "cmd:/hello",
 				"session_key": wantSessionKey,

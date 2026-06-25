@@ -687,20 +687,17 @@ func (p *Platform) onCardAction(event *callback.CardActionTriggerEvent) (*callba
 		}
 	}
 
-	userID := ""
-	if event.Event.Operator != nil {
-		userID = event.Event.Operator.OpenID
-	}
 	chatID := ""
 	messageID := ""
 	if event.Event.Context != nil {
 		chatID = event.Event.Context.OpenChatID
 		messageID = event.Event.Context.OpenMessageID
 	}
+	sessionKey := p.sessionKeyFromCardAction(chatID, userIDFromCardOperator(event.Event.Operator), event.Event.Action.Value)
+	userID := userIDFromCardAction(event.Event.Operator, sessionKey)
 	if chatID == "" {
 		chatID = userID
 	}
-	sessionKey := p.sessionKeyFromCardAction(chatID, userID, event.Event.Action.Value)
 
 	// nav: / act: — synchronous card update
 	if strings.HasPrefix(actionVal, "nav:") || strings.HasPrefix(actionVal, "act:") {
@@ -1709,7 +1706,48 @@ func userIDFromEvent(id *larkim.UserId) string {
 	if id == nil || id.UnionId == nil {
 		return ""
 	}
-	return *id.UnionId
+	return strings.TrimSpace(*id.UnionId)
+}
+
+func userIDFromCardOperator(operator *callback.Operator) string {
+	if operator == nil || operator.UserID == nil {
+		return ""
+	}
+	userID := strings.TrimSpace(*operator.UserID)
+	if !isFeishuUnionID(userID) {
+		return ""
+	}
+	return userID
+}
+
+func userIDFromCardAction(operator *callback.Operator, sessionKey string) string {
+	if userID := userIDFromCardOperator(operator); userID != "" {
+		return userID
+	}
+	return unionIDFromSessionKey(sessionKey)
+}
+
+func userIDFromApplicationUserID(id *larkapplication.UserId) string {
+	if id == nil || id.UnionId == nil {
+		return ""
+	}
+	return strings.TrimSpace(*id.UnionId)
+}
+
+func unionIDFromSessionKey(sessionKey string) string {
+	parts := strings.Split(sessionKey, ":")
+	if len(parts) < 3 || parts[2] == "root" {
+		return ""
+	}
+	userID := strings.TrimSpace(parts[2])
+	if !isFeishuUnionID(userID) {
+		return ""
+	}
+	return userID
+}
+
+func isFeishuUnionID(userID string) bool {
+	return strings.HasPrefix(userID, "on_") || strings.HasPrefix(userID, "union")
 }
 
 func (p *Platform) cacheMentionUserNames(mentions []*larkim.MentionEvent) {
@@ -4845,11 +4883,11 @@ func (p *Platform) onBotMenu(event *larkapplication.P2BotMenuV6) error {
 	eventKey := *event.Event.EventKey
 
 	userID := ""
-	if event.Event.Operator != nil && event.Event.Operator.OperatorId != nil && event.Event.Operator.OperatorId.OpenId != nil {
-		userID = *event.Event.Operator.OperatorId.OpenId
+	if event.Event.Operator != nil {
+		userID = userIDFromApplicationUserID(event.Event.Operator.OperatorId)
 	}
 	if userID == "" {
-		slog.Debug(p.tag()+": bot menu event without user id", "event_key", eventKey)
+		slog.Debug(p.tag()+": bot menu event without union user id", "event_key", eventKey)
 		return nil
 	}
 
